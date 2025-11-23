@@ -177,7 +177,8 @@
         lastMonth: null,
         lastDate: null,
         lastDay: null,
-        lastSecond: null
+        lastSecond: null,
+        cumulativeSeconds: 0 // New tracker for continuous rotation
     };
 
     // Animation Configurations
@@ -196,6 +197,14 @@
             m: now.getMinutes(),
             s: now.getSeconds()
         };
+
+        // --- Init State (if first run) ---
+        if (state.lastSecond === null) {
+            state.lastSecond = cur.s;
+            // Seed cumulative degrees based on current time
+            state.cumulativeSeconds = cur.s * 6;
+            els.hands.s.style.transform = `rotate(${state.cumulativeSeconds}deg)`;
+        }
 
         // --- Rings Animation (Only triggered on change) ---
         
@@ -226,27 +235,25 @@
 
         // --- Hands Animation ---
 
-        // Hour (Smooth)
+        // Hour
         const hDeg = (cur.h % 12) * 30 + cur.m * 0.5;
-        // Direct transform for hours/mins as they move slowly and don't need distinct ticks
         els.hands.h.style.transform = `rotate(${hDeg}deg)`;
         
+        // Minute
         const mDeg = cur.m * 6 + cur.s * 0.1;
         els.hands.m.style.transform = `rotate(${mDeg}deg)`;
 
-        // Second (Ticking Spring)
+        // Second (Ticking Spring with Continuous Rotation)
         if (cur.s !== state.lastSecond) {
-            const sDeg = cur.s * 6;
-            
-            // Handle the 59 -> 0 wrap-around
-            // If going from 354deg to 0deg, motion might spin backward.
-            // We want it to go 354 -> 360.
-            // Motion handle relative rotation well, but simple animate works if we don't care about wrap glitch once a minute
-            // OR we can just use cumulative degrees.
-            // For simplicity in this demo, standard rotate is fine.
+            // Calculate step size (usually 1, but handles tab throttling)
+            let step = cur.s - state.lastSecond;
+            // If we wrapped (e.g. 59 -> 0, result is -59), correct it to +1
+            if (step < 0) step += 60;
+
+            state.cumulativeSeconds += step * 6;
             
             animate(els.hands.s, 
-                { transform: `rotate(${sDeg}deg)` }, 
+                { transform: `rotate(${state.cumulativeSeconds}deg)` }, 
                 { easing: spring(tickSpring) } 
             );
             state.lastSecond = cur.s;

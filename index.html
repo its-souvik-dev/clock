@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rotated Perpetual Calendar Clock</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* --- Sizing --- */
+            --size: 750px;
+            
+            /* Ring Radii */
+            --r-clock: 95px;
+            --r-days:  150px;
+            --r-months: 205px;
+            --r-dates: 260px;
+            --r-years: 315px;
+            
+            /* --- Palette --- */
+            --bg-body: #050505;
+            /* Deep, subtle ambient glow in background */
+            --bg-gradient: radial-gradient(circle at 50% 30%, #1a202c 0%, #000000 70%);
+            
+            --text-active: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.15);
+            
+            --accent-glow: #00f2ff; /* Cyber Cyan */
+            --accent-secondary: #7000ff; /* Deep Violet for subtle shadows */
+            --indicator-color: #ff2a6d; /* Hot Pink/Red for the pointer */
+            
+            --font-main: 'Outfit', sans-serif;
+            
+            /* Animation */
+            --transition-speed: 0.8s;
+            --transition-curve: cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-body);
+            background-image: var(--bg-gradient);
+            font-family: var(--font-main);
+            overflow: hidden;
+            color: white;
+        }
+
+        .calendar-widget {
+            width: var(--size);
+            height: var(--size);
+            position: relative;
+            transform-origin: center;
+        }
+
+        /* --- Global Masking --- 
+           This creates the "fade out" effect at the bottom, 
+           keeping focus on the top active area. 
+        */
+        .mask-container {
+            position: absolute;
+            inset: 0;
+            -webkit-mask-image: linear-gradient(to bottom, black 40%, transparent 95%);
+            mask-image: linear-gradient(to bottom, black 40%, transparent 95%);
+            pointer-events: none;
+        }
+
+        /* --- Indicator (Top Center) --- */
+        .indicator-group {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            filter: drop-shadow(0 0 8px var(--indicator-color));
+        }
+
+        .indicator-notch {
+            width: 0; 
+            height: 0; 
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-top: 10px solid var(--indicator-color);
+        }
+
+        .indicator-line {
+            width: 1px;
+            height: 120px;
+            background: linear-gradient(to bottom, var(--indicator-color), transparent);
+            opacity: 0.5;
+            margin-top: -2px;
+        }
+
+        /* --- Tracks (Decorative Circles) --- */
+        .track-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .track-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 50%;
+            z-index: 0;
+        }
+        
+        /* Dashed subtle texture on tracks */
+        .track-line::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 50%;
+            border: 1px dashed rgba(255,255,255,0.05);
+            animation: spin-slow 120s linear infinite;
+        }
+
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* --- Rings --- */
+        .ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0; 
+            height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform var(--transition-speed) var(--transition-curve);
+            will-change: transform;
+            z-index: 10;
+        }
+
+        .ring-item {
+            position: absolute;
+            top: 0; left: 0;
+            width: 0; height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ring-item span {
+            white-space: nowrap;
+            transform: translateY(-2px); /* Slight visual optical correction */
+            font-size: 14px;
+            font-weight: 300;
+            color: var(--text-dim);
+            transition: all 0.5s ease;
+            letter-spacing: 1px;
+        }
+
+        /* Specific typography tweaks per ring */
+        .ring.days .ring-item span   { font-size: 12px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; }
+        .ring.months .ring-item span { font-size: 13px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+        .ring.dates .ring-item span  { font-size: 16px; font-family: 'Outfit', monospace; font-variant-numeric: tabular-nums; }
+        .ring.years .ring-item span  { font-size: 14px; font-weight: 300; letter-spacing: 2px; }
+
+        /* Active State Styling */
+        .ring-item.active span {
+            color: var(--text-active);
+            font-weight: 800;
+            font-size: 1.25em; /* Scale up active */
+            text-shadow: 
+                0 0 10px var(--accent-glow),
+                0 0 20px rgba(0, 242, 255, 0.4);
+            transform: translateY(-2px) scale(1.1); /* Pop effect */
+        }
+
+        /* --- Analog Clock Face (Glassmorphism) --- */
+        .clock-face {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: calc(var(--r-clock) * 2);
+            height: calc(var(--r-clock) * 2);
+            transform: translate(-50%, -50%);
+            
+            /* Glass Effect */
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 
+                0 0 50px rgba(0,0,0,0.8),
+                inset 0 0 20px rgba(255,255,255,0.02);
+            z-index: 50;
+        }
+        
+        /* Clock Markers */
+        .clock-marker {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 1px; height: 100%;
+            pointer-events: none;
+        }
+        .clock-marker::before, .clock-marker::after {
+            content: ''; position: absolute; left: 0; width: 100%; height: 8px; background: rgba(255,255,255,0.2);
+        }
+        .clock-marker::before { top: 0; }
+        .clock-marker::after { bottom: 0; }
+
+        /* Hands */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            border-radius: 50px;
+            z-index: 51;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .hand.hour { 
+            width: 6px; height: 40px; 
+            background: white; 
+            margin-left: -3px; 
+        }
+        .hand.min { 
+            width: 4px; height: 60px; 
+            background: #94a3b8; 
+            margin-left: -2px; 
+        }
+        .hand.sec { 
+            width: 2px; height: 75px; 
+            background: var(--indicator-color); 
+            margin-left: -1px; 
+            box-shadow: 0 0 10px var(--indicator-color);
+        }
+        
+        .pivot { 
+            position: absolute; top: 50%; left: 50%; 
+            width: 10px; height: 10px; 
+            background: white; 
+            border: 2px solid var(--indicator-color);
+            border-radius: 50%; 
+            transform: translate(-50%,-50%); 
+            z-index: 52; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        /* Responsiveness */
+        @media (max-width: 800px) {
+            .calendar-widget { transform: scale(0.7); }
+        }
+        @media (max-width: 500px) {
+            .calendar-widget { transform: scale(0.5); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="calendar-widget">
+        <!-- Indicator -->
+        <div class="indicator-group">
+            <div class="indicator-notch"></div>
+            <div class="indicator-line"></div>
+        </div>
+
+        <!-- Decorative Tracks -->
+        <div class="track-layer">
+            <div class="track-line" style="width: calc(var(--r-days)*2); height: calc(var(--r-days)*2);"></div>
+            <div class="track-line" style="width: calc(var(--r-months)*2); height: calc(var(--r-months)*2);"></div>
+            <div class="track-line" style="width: calc(var(--r-dates)*2); height: calc(var(--r-dates)*2);"></div>
+            <div class="track-line" style="width: calc(var(--r-years)*2); height: calc(var(--r-years)*2);"></div>
+        </div>
+
+        <!-- Masked Area for Rings -->
+        <div class="mask-container">
+            <div class="ring years" id="ringYears"></div>
+            <div class="ring dates" id="ringDates"></div>
+            <div class="ring months" id="ringMonths"></div>
+            <div class="ring days" id="ringDays"></div>
+        </div>
+
+        <!-- Clock Face -->
+        <div class="clock-face" id="clockFace">
+            <!-- Markers generated by JS -->
+            <div class="hand hour" id="handHour"></div>
+            <div class="hand min" id="handMin"></div>
+            <div class="hand sec" id="handSec"></div>
+            <div class="pivot"></div>
+        </div>
+    </div>
+
+<script>
+    const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    
+    // Generate Years
+    const currentYear = new Date().getFullYear();
+    const YEARS = [];
+    for(let i = currentYear - 12; i <= currentYear + 12; i++) {
+        YEARS.push(i);
+    }
+    const DATES = Array.from({length: 31}, (_, i) => i + 1);
+
+    const els = {
+        years: document.getElementById('ringYears'),
+        dates: document.getElementById('ringDates'),
+        months: document.getElementById('ringMonths'),
+        days: document.getElementById('ringDays'),
+        clockFace: document.getElementById('clockFace'),
+        hands: {
+            h: document.getElementById('handHour'),
+            m: document.getElementById('handMin'),
+            s: document.getElementById('handSec')
+        }
+    };
+
+    // 1. Generate Clock Markers (visual flair)
+    for(let i=0; i<6; i++) {
+        const marker = document.createElement('div');
+        marker.className = 'clock-marker';
+        marker.style.transform = `translate(-50%, -50%) rotate(${i * 30}deg)`;
+        els.clockFace.appendChild(marker);
+    }
+
+    // 2. Build Ring Items
+    function buildRing(container, items, radiusVar) {
+        const itemEls = [];
+        const angleStep = 360 / items.length;
+        
+        items.forEach((val, index) => {
+            const el = document.createElement('div');
+            el.className = 'ring-item';
+            
+            const span = document.createElement('span');
+            span.textContent = val;
+            el.appendChild(span);
+            
+            // Position Logic:
+            // 1. Rotate to angle
+            // 2. Translate out by radius
+            // 3. Rotate 90deg so text stands perpendicular to radius (like spokes)
+            const angle = index * angleStep;
+            el.style.transform = `rotate(${angle}deg) translate(var(${radiusVar})) rotate(90deg)`;
+            
+            container.appendChild(el);
+            itemEls.push(el);
+        });
+        
+        return { itemEls, angleStep };
+    }
+
+    const ringData = {
+        years:  buildRing(els.years, YEARS, '--r-years'),
+        dates:  buildRing(els.dates, DATES, '--r-dates'),
+        months: buildRing(els.months, MONTHS, '--r-months'),
+        days:   buildRing(els.days, DAYS, '--r-days')
+    };
+
+    // 3. Update Loop
+    function update() {
+        const now = new Date();
+        
+        const cur = {
+            year: now.getFullYear(),
+            month: now.getMonth(), 
+            date: now.getDate(),   
+            day: now.getDay(),      
+            h: now.getHours(),
+            m: now.getMinutes(),
+            s: now.getSeconds(),
+            ms: now.getMilliseconds()
+        };
+
+        // --- Ring Rotation ---
+        const yearIndex = YEARS.indexOf(cur.year);
+        if(yearIndex > -1) rotateRing(els.years, ringData.years, yearIndex);
+        rotateRing(els.dates, ringData.dates, cur.date - 1);
+        rotateRing(els.months, ringData.months, cur.month);
+        rotateRing(els.days, ringData.days, cur.day);
+
+        // --- Hands Rotation ---
+        // Add milliseconds for super smooth second hand movement
+        const sRaw = cur.s + (cur.ms / 1000); 
+        const sDeg = sRaw * 6;
+        const mDeg = cur.m * 6 + sRaw * 0.1;
+        const hDeg = (cur.h % 12) * 30 + cur.m * 0.5;
+        
+        els.hands.s.style.transform = `rotate(${sDeg}deg)`;
+        els.hands.m.style.transform = `rotate(${mDeg}deg)`;
+        els.hands.h.style.transform = `rotate(${hDeg}deg)`;
+
+        requestAnimationFrame(update);
+    }
+
+    function rotateRing(containerEl, data, activeIndex) {
+        // Target: Active item at -90deg (Top)
+        const targetRot = -90 - (activeIndex * data.angleStep);
+        
+        containerEl.style.transform = `translate(-50%, -50%) rotate(${targetRot}deg)`;
+
+        // Highlight Active
+        data.itemEls.forEach((el, i) => {
+            // Using classList is efficient enough here
+            if (i === activeIndex) {
+                if(!el.classList.contains('active')) el.classList.add('active');
+            } else {
+                if(el.classList.contains('active')) el.classList.remove('active');
+            }
+        });
+    }
+
+    update();
+</script>
+</body>
+</html>

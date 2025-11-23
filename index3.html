@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motion.dev Perpetual Calendar</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['Outfit', 'monospace'],
+                    },
+                    colors: {
+                        void: '#050505',
+                        accent: '#00f2ff',
+                        indicator: '#ff2a6d',
+                    },
+                    boxShadow: {
+                        'glow': '0 0 20px rgba(0, 242, 255, 0.3)',
+                        'clock': '0 0 50px rgba(0,0,0,0.8), inset 0 0 20px rgba(255,255,255,0.02)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --r-clock: 95px;
+            --r-days:  150px;
+            --r-months: 205px;
+            --r-dates: 260px;
+            --r-years: 315px;
+        }
+
+        .ring-item.active span {
+            color: #ffffff;
+            font-weight: 800;
+            font-size: 1.25em;
+            text-shadow: 0 0 15px #00f2ff, 0 0 30px rgba(0, 242, 255, 0.4);
+            transform: translateY(-2px) scale(1.1);
+        }
+
+        /* Dash spin animation */
+        @keyframes spin-slow { to { transform: rotate(360deg); } }
+        .animate-spin-slow { animation: spin-slow 120s linear infinite; }
+    </style>
+</head>
+<body class="bg-void h-screen flex items-center justify-center overflow-hidden text-white bg-[radial-gradient(circle_at_50%_30%,#1a202c_0%,#000000_70%)]">
+
+    <!-- Scale Wrapper -->
+    <div class="relative w-[750px] h-[750px] origin-center scale-[0.5] sm:scale-[0.7] md:scale-100 transition-transform duration-500">
+
+        <!-- Indicator -->
+        <div class="absolute top-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center drop-shadow-[0_0_8px_rgba(255,42,109,0.8)]">
+            <div class="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[10px] border-t-indicator"></div>
+            <div class="w-[1px] h-32 bg-gradient-to-b from-indicator to-transparent opacity-50 -mt-[2px]"></div>
+        </div>
+
+        <!-- Static Tracks -->
+        <div class="absolute inset-0 pointer-events-none">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/5 z-0" style="width: calc(var(--r-days)*2); height: calc(var(--r-days)*2);"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/5 z-0" style="width: calc(var(--r-months)*2); height: calc(var(--r-months)*2);"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/5 z-0" style="width: calc(var(--r-dates)*2); height: calc(var(--r-dates)*2);"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/5 z-0" style="width: calc(var(--r-years)*2); height: calc(var(--r-years)*2);">
+                 <div class="absolute inset-[-1px] rounded-full border border-dashed border-white/5 animate-spin-slow"></div>
+            </div>
+        </div>
+
+        <!-- Rings Container (Masked) -->
+        <div class="absolute inset-0 pointer-events-none z-10 [mask-image:linear-gradient(to_bottom,black_40%,transparent_95%)]">
+            <!-- Note: Removed CSS transitions here, Motion.dev will handle style -->
+            <div class="absolute top-1/2 left-1/2 w-0 h-0 flex items-center justify-center" id="ringYears"></div>
+            <div class="absolute top-1/2 left-1/2 w-0 h-0 flex items-center justify-center" id="ringDates"></div>
+            <div class="absolute top-1/2 left-1/2 w-0 h-0 flex items-center justify-center" id="ringMonths"></div>
+            <div class="absolute top-1/2 left-1/2 w-0 h-0 flex items-center justify-center" id="ringDays"></div>
+        </div>
+
+        <!-- Clock Face -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10 shadow-clock backdrop-blur-md bg-white/5 z-50" 
+             style="width: calc(var(--r-clock)*2); height: calc(var(--r-clock)*2);" 
+             id="clockFace">
+            
+            <div class="absolute bottom-1/2 left-1/2 origin-bottom -translate-x-1/2 w-[6px] h-10 bg-white rounded-full shadow-lg z-50" id="handHour"></div>
+            <div class="absolute bottom-1/2 left-1/2 origin-bottom -translate-x-1/2 w-[4px] h-[60px] bg-slate-400 rounded-full shadow-lg z-50" id="handMin"></div>
+            <div class="absolute bottom-1/2 left-1/2 origin-bottom -translate-x-1/2 w-[2px] h-[75px] bg-indicator shadow-[0_0_10px_#ff2a6d] rounded-full z-50" id="handSec"></div>
+            
+            <div class="absolute top-1/2 left-1/2 w-2.5 h-2.5 bg-white border-2 border-indicator rounded-full -translate-x-1/2 -translate-y-1/2 z-[60] shadow-md"></div>
+        </div>
+    </div>
+
+<!-- Motion One Library -->
+<script type="module">
+    import { animate, spring } from "https://cdn.jsdelivr.net/npm/motion@10.18.0/+esm";
+
+    const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    const DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    const currentYear = new Date().getFullYear();
+    const YEARS = [];
+    for(let i = currentYear - 12; i <= currentYear + 12; i++) { YEARS.push(i); }
+    const DATES = Array.from({length: 31}, (_, i) => i + 1);
+
+    const els = {
+        years: document.getElementById('ringYears'),
+        dates: document.getElementById('ringDates'),
+        months: document.getElementById('ringMonths'),
+        days: document.getElementById('ringDays'),
+        hands: {
+            h: document.getElementById('handHour'),
+            m: document.getElementById('handMin'),
+            s: document.getElementById('handSec')
+        },
+        clockFace: document.getElementById('clockFace')
+    };
+
+    // --- Build Markers ---
+    for(let i=0; i<6; i++) {
+        const marker = document.createElement('div');
+        marker.className = 'absolute top-1/2 left-1/2 w-[1px] h-full pointer-events-none';
+        marker.innerHTML = `<div class="absolute top-0 left-0 w-full h-2 bg-white/20"></div><div class="absolute bottom-0 left-0 w-full h-2 bg-white/20"></div>`;
+        marker.style.transform = `translate(-50%, -50%) rotate(${i * 30}deg)`;
+        els.clockFace.appendChild(marker);
+    }
+
+    // --- Build Rings ---
+    function buildRing(container, items, radiusVar, typeClass) {
+        const itemEls = [];
+        const angleStep = 360 / items.length;
+        
+        items.forEach((val, index) => {
+            const el = document.createElement('div');
+            el.className = 'ring-item absolute top-0 left-0 w-0 h-0 flex items-center justify-center';
+            
+            const span = document.createElement('span');
+            span.textContent = val;
+            
+            let typoClasses = 'whitespace-nowrap -translate-y-0.5 transition-all duration-500 text-white/15 tracking-widest font-light';
+            if(typeClass === 'days') typoClasses += ' text-[12px] font-medium tracking-[3px] uppercase';
+            else if(typeClass === 'months') typoClasses += ' text-[13px] font-semibold tracking-[2px] uppercase';
+            else if(typeClass === 'dates') typoClasses += ' text-[16px] font-mono tabular-nums';
+            else if(typeClass === 'years') typoClasses += ' text-[14px] font-light tracking-[2px]';
+            
+            span.className = typoClasses;
+            el.appendChild(span);
+            
+            const angle = index * angleStep;
+            // Static initial placement
+            el.style.transform = `rotate(${angle}deg) translate(var(${radiusVar})) rotate(90deg)`;
+            
+            container.appendChild(el);
+            itemEls.push(el);
+        });
+        
+        return { itemEls, angleStep };
+    }
+
+    const ringData = {
+        years:  buildRing(els.years, YEARS, '--r-years', 'years'),
+        dates:  buildRing(els.dates, DATES, '--r-dates', 'dates'),
+        months: buildRing(els.months, MONTHS, '--r-months', 'months'),
+        days:   buildRing(els.days, DAYS, '--r-days', 'days')
+    };
+
+    // --- Animation State ---
+    const state = {
+        lastYear: null,
+        lastMonth: null,
+        lastDate: null,
+        lastDay: null,
+        lastSecond: null
+    };
+
+    // Animation Configurations
+    const ringSpring = { stiffness: 60, damping: 15, mass: 1 };
+    const handSpring = { stiffness: 200, damping: 15, mass: 0.5 };
+    const tickSpring = { stiffness: 400, damping: 25, mass: 1 };
+
+    function update() {
+        const now = new Date();
+        const cur = {
+            year: now.getFullYear(),
+            month: now.getMonth(), 
+            date: now.getDate(),   
+            day: now.getDay(),      
+            h: now.getHours(),
+            m: now.getMinutes(),
+            s: now.getSeconds()
+        };
+
+        // --- Rings Animation (Only triggered on change) ---
+        
+        // Years
+        if (cur.year !== state.lastYear) {
+            const yearIndex = YEARS.indexOf(cur.year);
+            if(yearIndex > -1) animateRing(els.years, ringData.years, yearIndex);
+            state.lastYear = cur.year;
+        }
+
+        // Dates
+        if (cur.date !== state.lastDate) {
+            animateRing(els.dates, ringData.dates, cur.date - 1);
+            state.lastDate = cur.date;
+        }
+
+        // Months
+        if (cur.month !== state.lastMonth) {
+            animateRing(els.months, ringData.months, cur.month);
+            state.lastMonth = cur.month;
+        }
+
+        // Days
+        if (cur.day !== state.lastDay) {
+            animateRing(els.days, ringData.days, cur.day);
+            state.lastDay = cur.day;
+        }
+
+        // --- Hands Animation ---
+
+        // Hour (Smooth)
+        const hDeg = (cur.h % 12) * 30 + cur.m * 0.5;
+        // Direct transform for hours/mins as they move slowly and don't need distinct ticks
+        els.hands.h.style.transform = `rotate(${hDeg}deg)`;
+        
+        const mDeg = cur.m * 6 + cur.s * 0.1;
+        els.hands.m.style.transform = `rotate(${mDeg}deg)`;
+
+        // Second (Ticking Spring)
+        if (cur.s !== state.lastSecond) {
+            const sDeg = cur.s * 6;
+            
+            // Handle the 59 -> 0 wrap-around
+            // If going from 354deg to 0deg, motion might spin backward.
+            // We want it to go 354 -> 360.
+            // Motion handle relative rotation well, but simple animate works if we don't care about wrap glitch once a minute
+            // OR we can just use cumulative degrees.
+            // For simplicity in this demo, standard rotate is fine.
+            
+            animate(els.hands.s, 
+                { transform: `rotate(${sDeg}deg)` }, 
+                { easing: spring(tickSpring) } 
+            );
+            state.lastSecond = cur.s;
+        }
+
+        requestAnimationFrame(update);
+    }
+
+    function animateRing(containerEl, data, activeIndex) {
+        // Target: -90deg (Top)
+        // Standard Angle = activeIndex * step
+        // Rotation Needed = -90 - Standard Angle
+        const targetRot = -90 - (activeIndex * data.angleStep);
+        
+        // Use Motion to animate the container
+        animate(
+            containerEl, 
+            { transform: `translate(-50%, -50%) rotate(${targetRot}deg)` },
+            { easing: spring(ringSpring) }
+        );
+
+        // Update Highlighting
+        data.itemEls.forEach((el, i) => {
+            if (i === activeIndex) {
+                if(!el.classList.contains('active')) el.classList.add('active');
+            } else {
+                if(el.classList.contains('active')) el.classList.remove('active');
+            }
+        });
+    }
+
+    // Kickstart
+    update();
+</script>
+</body>
+</html>
